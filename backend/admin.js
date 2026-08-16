@@ -7,7 +7,9 @@ export default function Admin() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Product states
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -17,43 +19,31 @@ export default function Admin() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Orders states
-  const [orders, setOrders] = useState([]);
-  const [ordersLoading, setOrdersLoading] = useState(true);
-  const [ordersError, setOrdersError] = useState("");
-
-  // Admin authentication
   useEffect(() => {
     if (!user) {
       navigate("/login");
+      return;
+    }
+
+    if (user.role === "admin") {
+      fetchOrders();
     }
   }, [user, navigate]);
 
-  // Fetch all orders
-  useEffect(() => {
-    const fetchOrders = async () => {
-      if (!user || user.role !== "admin") return;
+  const fetchOrders = async () => {
+    try {
+      setOrdersLoading(true);
 
-      try {
-        setOrdersLoading(true);
-        setOrdersError("");
+      const res = await api.get("/orders");
 
-        const response = await api.get("/orders");
-        setOrders(response.data);
-      } catch (error) {
-        console.error("Orders fetch error:", error);
-        setOrdersError(
-          error.response?.data?.message || "Could not load orders"
-        );
-      } finally {
-        setOrdersLoading(false);
-      }
-    };
+      setOrders(res.data);
+    } catch (error) {
+      console.error("Failed to fetch orders:", error);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
-    fetchOrders();
-  }, [user]);
-
-  // User not loaded
   if (!user) {
     return (
       <main className="min-h-screen flex items-center justify-center">
@@ -62,7 +52,6 @@ export default function Admin() {
     );
   }
 
-  // Not admin
   if (user.role !== "admin") {
     return (
       <main className="max-w-3xl mx-auto px-6 py-20 text-center">
@@ -77,7 +66,6 @@ export default function Admin() {
     );
   }
 
-  // Add Product
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -111,257 +99,147 @@ export default function Admin() {
     }
   };
 
-  const totalOrders = orders.length;
-
-  const pendingOrders = orders.filter(
-    (order) => order.status === "pending"
-  ).length;
-
-  const totalSales = orders.reduce(
-    (sum, order) => sum + Number(order.totalAmount || 0),
-    0
-  );
-
   return (
     <main className="max-w-6xl mx-auto px-6 py-14">
 
       {/* ADMIN HEADER */}
-      <div className="mb-10">
-        <h1 className="font-display text-3xl font-bold">
-          SHRIKA Admin
-        </h1>
+      <h1 className="font-display text-3xl font-bold mb-2">
+        SHRIKA Admin
+      </h1>
 
-        <p className="text-muted mt-2">
-          Manage products and monitor customer orders.
-        </p>
-      </div>
+      <p className="text-muted mb-10">
+        Manage products and orders.
+      </p>
 
-      {/* ORDER SUMMARY */}
-      <section className="grid md:grid-cols-3 gap-4 mb-10">
-
-        <div className="bg-white border border-ink/10 rounded-2xl p-6">
-          <p className="text-muted text-sm">
-            Total Orders
-          </p>
-
-          <p className="text-3xl font-bold mt-2">
-            {totalOrders}
-          </p>
-        </div>
-
-        <div className="bg-white border border-ink/10 rounded-2xl p-6">
-          <p className="text-muted text-sm">
-            Pending Orders
-          </p>
-
-          <p className="text-3xl font-bold mt-2">
-            {pendingOrders}
-          </p>
-        </div>
-
-        <div className="bg-white border border-ink/10 rounded-2xl p-6">
-          <p className="text-muted text-sm">
-            Total Sales
-          </p>
-
-          <p className="text-3xl font-bold mt-2">
-            ₹{totalSales.toLocaleString("en-IN")}
-          </p>
-        </div>
-
-      </section>
-
-      {/* ORDERS */}
+      {/* ORDERS SECTION */}
       <section className="mb-12">
 
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="font-display text-2xl font-bold">
-              Customer Orders
+              Orders
             </h2>
 
-            <p className="text-muted mt-1">
-              View all orders placed by customers.
+            <p className="text-muted">
+              {orders.length} order{orders.length !== 1 ? "s" : ""} received
             </p>
           </div>
+
+          <button
+            onClick={fetchOrders}
+            className="px-5 py-2 rounded-full bg-ink text-white"
+          >
+            Refresh
+          </button>
         </div>
 
-        {ordersLoading && (
-          <div className="bg-white border border-ink/10 rounded-2xl p-8 text-center">
+        {ordersLoading ? (
+          <p className="text-muted">
+            Loading orders...
+          </p>
+        ) : orders.length === 0 ? (
+          <div className="border rounded-2xl p-6">
             <p className="text-muted">
-              Loading orders...
+              No orders yet.
             </p>
           </div>
-        )}
+        ) : (
+          <div className="flex flex-col gap-4">
 
-        {ordersError && (
-          <div className="bg-white border border-red-200 rounded-2xl p-6">
-            <p className="text-red-600">
-              {ordersError}
-            </p>
-          </div>
-        )}
+            {orders.map((order) => (
+              <div
+                key={order._id}
+                className="bg-white border border-ink/10 rounded-2xl p-6"
+              >
 
-        {!ordersLoading &&
-          !ordersError &&
-          orders.length === 0 && (
-            <div className="bg-white border border-ink/10 rounded-2xl p-8 text-center">
-              <p className="text-muted">
-                No orders yet.
-              </p>
-            </div>
-          )}
+                <div className="flex justify-between items-start gap-4">
 
-        <div className="flex flex-col gap-5">
+                  <div>
+                    <p className="font-bold">
+                      Order #{order._id.slice(-6).toUpperCase()}
+                    </p>
 
-          {orders.map((order) => (
+                    <p className="text-sm text-muted mt-1">
+                      {new Date(order.createdAt).toLocaleString()}
+                    </p>
+                  </div>
 
-            <div
-              key={order._id}
-              className="bg-white border border-ink/10 rounded-2xl p-6"
-            >
+                  <span className="px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 text-sm">
+                    {order.status?.toUpperCase()}
+                  </span>
 
-              {/* ORDER TOP */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
-
-                <div>
-                  <p className="font-bold">
-                    Order #{order._id?.slice(-8)}
-                  </p>
-
-                  <p className="text-sm text-muted mt-1">
-                    {new Date(order.createdAt).toLocaleString(
-                      "en-IN"
-                    )}
-                  </p>
                 </div>
 
-                <span className="px-4 py-2 rounded-full bg-yellow-100 text-yellow-700 text-sm font-semibold w-fit">
-                  {order.status?.toUpperCase()}
-                </span>
+                <div className="mt-5 grid md:grid-cols-2 gap-4">
 
-              </div>
+                  <div>
+                    <p className="font-semibold">
+                      Customer
+                    </p>
 
-              {/* CUSTOMER DETAILS */}
-              <div className="grid md:grid-cols-2 gap-4 mb-5">
+                    <p>{order.customerName}</p>
+                    <p className="text-sm text-muted">
+                      {order.customerEmail}
+                    </p>
+                    <p className="text-sm text-muted">
+                      {order.phone}
+                    </p>
+                  </div>
 
-                <div>
-                  <p className="text-sm text-muted">
-                    Customer
-                  </p>
+                  <div>
+                    <p className="font-semibold">
+                      Address
+                    </p>
 
-                  <p className="font-semibold">
-                    {order.customerName ||
-                      order.user?.name ||
-                      "N/A"}
-                  </p>
+                    <p className="text-sm text-muted">
+                      {order.address}
+                    </p>
+                  </div>
+
                 </div>
 
-                <div>
-                  <p className="text-sm text-muted">
-                    Email
+                <div className="mt-5">
+
+                  <p className="font-semibold mb-2">
+                    Items
                   </p>
-
-                  <p className="font-semibold">
-                    {order.customerEmail ||
-                      order.user?.email ||
-                      "N/A"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-muted">
-                    Phone
-                  </p>
-
-                  <p className="font-semibold">
-                    {order.phone || "N/A"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm text-muted">
-                    Address
-                  </p>
-
-                  <p className="font-semibold">
-                    {order.address || "N/A"}
-                  </p>
-                </div>
-
-              </div>
-
-              {/* PRODUCTS */}
-              <div className="border-t border-ink/10 pt-5">
-
-                <p className="font-semibold mb-3">
-                  Ordered Products
-                </p>
-
-                <div className="flex flex-col gap-3">
 
                   {order.items?.map((item, index) => (
-
                     <div
-                      key={item._id || index}
-                      className="flex justify-between items-center bg-gray-50 rounded-xl p-4"
+                      key={index}
+                      className="flex justify-between border-b py-2 text-sm"
                     >
+                      <span>
+                        {item.name || item.product?.name}
+                        {" × "}
+                        {item.quantity}
+                      </span>
 
-                      <div>
-                        <p className="font-semibold">
-                          {item.name ||
-                            item.product?.name ||
-                            item.title ||
-                            "Product"}
-                        </p>
-
-                        <p className="text-sm text-muted">
-                          Quantity: {item.quantity || 1}
-                        </p>
-                      </div>
-
-                      <p className="font-semibold">
-                        ₹
-                        {Number(
-                          item.price ||
-                            item.product?.price ||
-                            0
-                        ).toLocaleString("en-IN")}
-                      </p>
-
+                      <span>
+                        ₹{item.price}
+                      </span>
                     </div>
-
                   ))}
 
                 </div>
 
-              </div>
+                <div className="mt-5 pt-4 border-t flex justify-between font-bold">
+                  <span>Total</span>
 
-              {/* TOTAL */}
-              <div className="border-t border-ink/10 mt-5 pt-5 flex justify-between items-center">
-
-                <span className="font-semibold">
-                  Order Total
-                </span>
-
-                <span className="text-xl font-bold">
-                  ₹
-                  {Number(
-                    order.totalAmount || 0
-                  ).toLocaleString("en-IN")}
-                </span>
+                  <span>
+                    ₹{Number(order.totalAmount).toLocaleString("en-IN")}
+                  </span>
+                </div>
 
               </div>
+            ))}
 
-            </div>
-
-          ))}
-
-        </div>
+          </div>
+        )}
 
       </section>
 
-      {/* ADD PRODUCT */}
+      {/* ADD PRODUCT SECTION */}
       <section>
 
         <h2 className="font-display text-2xl font-bold mb-2">
