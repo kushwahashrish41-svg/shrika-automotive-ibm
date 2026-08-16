@@ -1,15 +1,17 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: "https://shrika-automotive-ibm.onrender.com/api",
 });
 
 // Attach token automatically if user is logged in
 api.interceptors.request.use((config) => {
   const user = JSON.parse(localStorage.getItem("user"));
+
   if (user?.token) {
     config.headers.Authorization = `Bearer ${user.token}`;
   }
+
   return config;
 });
 
